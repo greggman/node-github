@@ -13,6 +13,7 @@
 
 var error = require("./../../error");
 var Util = require("./../../util");
+var url = require('url');
 
 var releases = module.exports = {
     releases: {}
@@ -340,7 +341,27 @@ var releases = module.exports = {
      **/
     this.uploadAsset = function(msg, block, callback) {
         var self = this;
+        
+        // We need to pass in an upload url from the createRelease job
+        if(msg.uploadUrl){
+            var parsedUrl = url.parse(msg.uploadUrl),
+                parts = parsedUrl.path.split('/repos/');
+            
+            block.host = parsedUrl.host;
+            block.pathPrefix = parts[0];
+            block.url = '/repos/' + parts[1];
+
+            // The upload_url sometimes has ?name in the url, we don't need that
+            block.url = block.url.replace('{?name}','');
+
+            // We don't need to append the owner id or repo because those are already in the upload_url
+            delete(msg.owner);
+            delete(msg.id);
+            delete(msg.repo);
+        }
+
         this.client.httpSend(msg, block, function(err, res) {
+
             if (err)
                 return self.sendError(err, null, msg, callback);
 
@@ -367,6 +388,9 @@ var releases = module.exports = {
                 callback(null, ret);
         });
     };
+
+
+
 
     /** section: github
      *  releases#editAsset(msg, callback) -> null
