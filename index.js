@@ -575,16 +575,23 @@ var Client = module.exports = function(config) {
 
     function getQueryAndUrl(msg, def, format, config) {
         var url = def.url;
-        if (config.pathPrefix) {
+        
+        if (def.pathPrefix) {
+            url = def.pathPrefix + def.url;
+        }
+        else if (config.pathPrefix) {
             url = config.pathPrefix + def.url;
         }
+        
         var ret = {
             query: format == "json" ? {} : []
         };
+
         if (!def || !def.params) {
             ret.url = url;
             return ret;
         }
+
 
         Object.keys(def.params).forEach(function(paramName) {
             paramName = paramName.replace(/^[$]+/, "");
@@ -652,6 +659,8 @@ var Client = module.exports = function(config) {
         var format = hasBody && this.constants.requestFormat
             ? this.constants.requestFormat
             : "query";
+
+
         var obj = getQueryAndUrl(msg, block, format, self.config);
         var query = obj.query;
         var url = this.config.url ? this.config.url + obj.url : obj.url;
