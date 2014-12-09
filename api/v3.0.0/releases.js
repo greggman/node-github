@@ -13,6 +13,7 @@
 
 var error = require("./../../error");
 var Util = require("./../../util");
+var url = require('url');
 
 var releases = module.exports = {
     releases: {}
@@ -324,6 +325,72 @@ var releases = module.exports = {
                 callback(null, ret);
         });
     };
+
+    /** section: github
+     *  releases#uploadAsset(msg, callback) -> null
+     *      - msg (Object): Object that contains the parameters and their values to be sent to the server.
+     *      - callback (Function): function to call when the request is finished with an error as first argument and result data as second argument.
+     *
+     *  ##### Params on the `msg` object:
+     *
+     *  - headers (Object): Optional. Key/ value pair of request headers to pass along with the HTTP request. Valid headers are: 'If-Modified-Since', 'If-None-Match', 'Cookie', 'User-Agent', 'Accept', 'X-GitHub-OTP'.
+     *  - owner (String): Required. 
+     *  - id (Number): Required. 
+     *  - repo (String): Required. 
+     *  - name (String): Required. the file name of the asset
+     **/
+    this.uploadAsset = function(msg, block, callback) {
+        var self = this;
+        
+        // We need to pass in an upload url from the createRelease job
+        if(msg.uploadUrl){
+            var parsedUrl = url.parse(msg.uploadUrl),
+                parts = parsedUrl.path.split('/repos/');
+            
+            block.host = parsedUrl.host;
+            block.pathPrefix = parts[0];
+            block.url = '/repos/' + parts[1];
+
+            // The upload_url sometimes has ?name in the url, we don't need that
+            block.url = block.url.replace('{?name}','');
+
+            // We don't need to append the owner id or repo because those are already in the upload_url
+            delete(msg.owner);
+            delete(msg.id);
+            delete(msg.repo);
+        }
+
+        this.client.httpSend(msg, block, function(err, res) {
+
+            if (err)
+                return self.sendError(err, null, msg, callback);
+
+            var ret;
+            try {
+                ret = res.data && JSON.parse(res.data);
+            }
+            catch (ex) {
+                if (callback)
+                    callback(new error.InternalServerError(ex.message), res);
+                return;
+            }
+
+            if (!ret)
+                ret = {};
+            if (!ret.meta)
+                ret.meta = {};
+            ["x-ratelimit-limit", "x-ratelimit-remaining", "x-ratelimit-reset", "x-oauth-scopes", "link", "location", "last-modified", "etag", "status"].forEach(function(header) {
+                if (res.headers[header])
+                    ret.meta[header] = res.headers[header];
+            });
+
+            if (callback)
+                callback(null, ret);
+        });
+    };
+
+
+
 
     /** section: github
      *  releases#editAsset(msg, callback) -> null
